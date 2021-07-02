@@ -7,7 +7,6 @@ import java.text.NumberFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 //todo Implement calculations with parantheses ()
-//todo Make inputField synchronize with keys and buttons, as of now they both individually alter inputField, which sets input field to diff values. Try MultiThreading
 //Todo Set focus of Jtextfield to listen to keys at all time, so long as frame is active.
 //NEW FEATURE
 //TODO Add answerButton, to enable users retrieve and use answers after calculations. Place it in between History buuton and delete button, or shift the clear button
@@ -18,7 +17,7 @@ public class Calculator extends JFrame implements ActionListener {
     private JPanel textPanel, optionsPanel, buttonPanel;
     private JTextArea historyArea;
     private JScrollPane historyAreaScrollPane;
-    private JFormattedTextField inputField;
+    private JTextField inputField;
     public JLabel resultLbl = new JLabel("0");
     private JButton historyBtn, deleteBtn, historyClearBtn;
     private final JButton [] btn = new JButton[20];
@@ -82,7 +81,7 @@ public class Calculator extends JFrame implements ActionListener {
 
         //Create input field and its settings
         constraints.gridy =1;
-        inputField = new JFormattedTextField(NumberFormat.getNumberInstance());
+        inputField = new JTextField();
         inputField.setFont(new Font("New Times Roman",Font.BOLD,24));
         //inputField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
         textPanel.add(inputField,constraints);
@@ -113,25 +112,22 @@ public class Calculator extends JFrame implements ActionListener {
         //Event Handling for history btn
         historyBtn.addActionListener(this);
 
-        //TODO When key is Typed, it outputs two chars, solve it. (Arbitrary commas too)
         //Event Handling for Keys (Uses ketAdapter and Anonymous inner class)
         inputField.addKeyListener(new KeyAdapter() {
             @Override
             public void keyTyped(KeyEvent e) {
                 super.keyTyped(e);
                 //With Help from Regex, checks if a typed character is not among allowed characters.
-                // If true, it does not display that character (consumes). If not it appends to existing character.
+                // If true, it does not display that character by consuming the keyChar
                 Pattern pattern = Pattern.compile("[^\\d.+\\-*/()]");
                 Matcher matcher = pattern.matcher(Character.toString(e.getKeyChar()));//Converts char to String
 
                 if (matcher.find()){
                     e.consume();
-                }else{
-                    inputField.setText( inputField.getText() + e.getKeyChar());
+                    //inputField.getInputMap().put(KeyStroke.getKeyStroke(e.getKeyChar()),"none");
                 }
-                if(e.getSource().equals(KeyEvent.VK_DELETE)){   //Set delete Key
-                    if(inputField.getText().length() == 0) { return; }
-                    inputField.setText(inputField.getText().substring(0, inputField.getText().length() - 1));
+                if (e.getKeyChar() == KeyEvent.VK_ENTER){
+                    computeInput();
                 }
             }
         });
@@ -187,7 +183,7 @@ public class Calculator extends JFrame implements ActionListener {
         //Todo Complete implementation for button -> %
         else if(e.getSource() == btn[2]){
             //If input is NOT invalid and it is TRUE that it did NOT find a */()
-            if (!inputInValidTest() && !Pattern.compile("[*/()]").matcher(inputField.getText()).find() ){
+            if (!inputInValidTest(inputField) && !Pattern.compile("[*/()]").matcher(inputField.getText()).find() ){
                 //If it finds (+ or -) it should be exactly 1, it can't find (+ and -) occurrence and if found, it must be at start index else output error.
                 if (Pattern.compile("[\\-+]").matcher(inputField.getText()).find() ){
 
@@ -215,31 +211,8 @@ public class Calculator extends JFrame implements ActionListener {
         }
         else if (e.getSource() == btn[19]){     // Equals (=) Btn
 
-            // 1st checks if input is valid
-            if (inputInValidTest()){
-                resultLbl.setText("Invalid input");
-                inputField.setText("");
-            }
-            //else if input has no operators [digit=digit]
-            else if (!Pattern.compile("[+\\-*/()]").matcher(inputField.getText()).find()){
-                historyArea.append(inputField.getText() +  "\n");
-                resultLbl.setText(inputField.getText());
-                inputField.setText("");
-            }
-            else { // else performs calculation and output the results
+            computeInput();
 
-                double secretDivisionByZeroCode = -0.9999989999;
-                double result = Calculation.calculationRecursion(inputField.getText());
-                //Checks for secretDivisionByZeroCode before applying default
-                if ( secretDivisionByZeroCode == result) {
-                    resultLbl.setText("ERROR");
-                    inputField.setText("");
-                } else {
-                    historyArea.append(inputField.getText() + " = " + result + "\n");
-                    inputField.setText("");
-                    resultLbl.setText(Double.toString(result));
-                }
-            }
         }
         else{ //Every other Btn
                 inputField.setText( inputField.getText() + e.getActionCommand());
@@ -271,32 +244,61 @@ public class Calculator extends JFrame implements ActionListener {
 
     /**
      * Checks if Input is valid for calculation
+     * @param input which is of typt JTextField
      * @return true if input is invalid
      * */
-    private boolean inputInValidTest(){
+    private boolean inputInValidTest(JTextField input){
 
         return (
             //Input is empty
-            inputField.getText().isEmpty() ||
+            input.getText().isEmpty() ||
 
             //Illegal char at start
-            Pattern.compile("[/*]").matcher(inputField.getText().substring(0,1)).find() ||
+            Pattern.compile("[/*]").matcher(input.getText().substring(0,1)).find() ||
 
             //Illegal char at end
-            Pattern.compile("[+\\-/*.]").matcher(Character.toString(inputField.getText().charAt(inputField.getText().length()-1))).find() ||
+            Pattern.compile("[+\\-/*.]").matcher(Character.toString(input.getText().charAt(input.getText().length()-1))).find() ||
 
             // . Not followed by digit
-            Pattern.compile("[.][^\\d]").matcher(inputField.getText()).find() ||
+            Pattern.compile("[.][^\\d]").matcher(input.getText()).find() ||
 
             // Operators not followed by digit
-            Pattern.compile("[\\-+/*][^\\d.]").matcher(inputField.getText()).find() ||
+            Pattern.compile("[\\-+/*][^\\d.]").matcher(input.getText()).find() ||
 
             //Operator followed by . must be followed by a digit
-            Pattern.compile("[\\-+/*][.][^\\d]").matcher(inputField.getText()).find() ||
+            Pattern.compile("[\\-+/*][.][^\\d]").matcher(input.getText()).find() ||
 
             //If input has no digits
-            !Pattern.compile("[\\d]").matcher(inputField.getText()).find()
+            !Pattern.compile("[\\d]").matcher(input.getText()).find()
         );
+    }
 
+    //  Computes calculation on Input called
+    private void computeInput() {
+        // 1st checks if input is valid
+        if (inputInValidTest(inputField)){
+            resultLbl.setText("Invalid input");
+            inputField.setText("");
+        }
+        //else if input has no operators [digit=digit]
+        else if (!Pattern.compile("[+\\-*/()]").matcher(inputField.getText()).find()){
+            historyArea.append(inputField.getText() +  "\n");
+            resultLbl.setText(inputField.getText());
+            inputField.setText("");
+        }
+        else { // else performs calculation and output the results
+
+            double secretDivisionByZeroCode = -0.9999989999;
+            double result = Calculation.calculationRecursion(inputField.getText());
+            //Checks for secretDivisionByZeroCode before applying default
+            if ( secretDivisionByZeroCode == result) {
+                resultLbl.setText("ERROR");
+                inputField.setText("");
+            } else {
+                historyArea.append(inputField.getText() + " = " + result + "\n");
+                inputField.setText("");
+                resultLbl.setText(Double.toString(result));
+            }
+        }
     }
 }
