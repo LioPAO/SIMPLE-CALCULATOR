@@ -3,13 +3,14 @@ package SimpleCalculator;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.text.NumberFormat;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-//todo Implement calculations with parantheses ()
-//Todo Set focus of Jtextfield to listen to keys at all time, so long as frame is active.
+//todo Implement calculations with parentheses ()
+//Todo Set focus of JTextField to listen to keys at all time, so long as frame is active.
 //NEW FEATURE
-//TODO Add answerButton, to enable users retrieve and use answers after calculations. Place it in between History buuton and delete button, or shift the clear button
+//TODO Add answerButton, to enable users retrieve and use answers after calculations. Place it in between History button and delete button, or shift the clear button
 
 public class Calculator extends JFrame implements ActionListener {
     //Variables / Properties--------------------------------------------------------------------------------------------
@@ -18,7 +19,7 @@ public class Calculator extends JFrame implements ActionListener {
     private JTextArea historyArea;
     private JScrollPane historyAreaScrollPane;
     private JTextField inputField;
-    public JLabel resultLbl = new JLabel("0");
+    private JLabel resultLbl = new JLabel("0");
     private JButton historyBtn, deleteBtn, historyClearBtn;
     private final JButton [] btn = new JButton[20];
 
@@ -76,14 +77,12 @@ public class Calculator extends JFrame implements ActionListener {
         //Create label with its settings
         resultLbl = new JLabel("0");
         resultLbl.setFont(new Font("New Times Roman",Font.BOLD,24));
-        //resultLbl.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
         textPanel.add(resultLbl,constraints);
 
         //Create input field and its settings
         constraints.gridy =1;
         inputField = new JTextField();
         inputField.setFont(new Font("New Times Roman",Font.BOLD,24));
-        //inputField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
         textPanel.add(inputField,constraints);
 
         //Adds buttons to optionPanel and setting size
@@ -117,6 +116,7 @@ public class Calculator extends JFrame implements ActionListener {
             @Override
             public void keyTyped(KeyEvent e) {
                 super.keyTyped(e);
+
                 //With Help from Regex, checks if a typed character is not among allowed characters.
                 // If true, it does not display that character by consuming the keyChar
                 Pattern pattern = Pattern.compile("[^\\d.+\\-*/()]");
@@ -125,12 +125,15 @@ public class Calculator extends JFrame implements ActionListener {
                 if (matcher.find()){
                     e.consume();
                     //inputField.getInputMap().put(KeyStroke.getKeyStroke(e.getKeyChar()),"none");
+                }else{
+                    inputField.requestFocusInWindow();
                 }
                 if (e.getKeyChar() == KeyEvent.VK_ENTER){
                     computeInput();
                 }
             }
         });
+
     }
 
     //Initializes a new frame alongside the history fame with predefined settings
@@ -179,28 +182,19 @@ public class Calculator extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if(e.getSource() == btn[0]){            // Clear(C) Btn
             inputField.setText("");
+            resultLbl.setText("");
         }
-        //Todo Complete implementation for button -> %
         else if(e.getSource() == btn[2]){
-            //If input is NOT invalid and it is TRUE that it did NOT find a */()
-            if (!inputInValidTest(inputField) && !Pattern.compile("[*/()]").matcher(inputField.getText()).find() ){
-                //If it finds (+ or -) it should be exactly 1, it can't find (+ and -) occurrence and if found, it must be at start index else output error.
-                if (Pattern.compile("[\\-+]").matcher(inputField.getText()).find() ){
-
-                }
-                double percent = Double.parseDouble(inputField.getText()) / 100;
-                resultLbl.setText(Double.toString(percent));
-                inputField.setText("");
-            }else {
-                resultLbl.setText("Invalid input");
-                inputField.setText("");
-            }
+            btn02Implementation();
         }
         else if (e.getSource() == btn[16]){     // +/- Btn
-           btn16Implementation();
+             btn16Implementation();
+        }
+        else if (e.getSource() == btn[19]){     // Equals (=) Btn
+            computeInput();
         }
         else if (e.getSource() == deleteBtn){   // Delete(<) Btn
-            if(inputField.getText().length() == 0) { return; }
+            if(inputField.getText().isEmpty()) { return; }
             inputField.setText(inputField.getText().substring(0, inputField.getText().length() - 1));
         }
         else if (e.getSource() == historyBtn){  // History (H)Btn
@@ -209,13 +203,33 @@ public class Calculator extends JFrame implements ActionListener {
             else{
                 historyFrame.setVisible(true); }
         }
-        else if (e.getSource() == btn[19]){     // Equals (=) Btn
-
-            computeInput();
-
+        else{                                   //Every other Btn
+            inputField.setText( inputField.getText() + e.getActionCommand());
         }
-        else{ //Every other Btn
-                inputField.setText( inputField.getText() + e.getActionCommand());
+    }
+
+    private void btn02Implementation() {
+        //If input is NOT invalid and it is TRUE that it did NOT find a */()
+        if (!inputInValidTest(inputField) && !Pattern.compile("[*/()]").matcher(inputField.getText()).find() ){
+            Pattern pattern = Pattern.compile("[+-]");
+            Matcher matcher = pattern.matcher(inputField.getText());
+            int count =0;
+            //Counts the occurrences of + or -
+            while (matcher.find()){
+                count++;
+            }
+            //Invalid input if more than one occurrences or if 1 then it should be the first.
+            if (count>1 || (count==1 && !Pattern.compile("^[\\-+]").matcher(inputField.getText()).find())){
+                resultLbl.setText("Invalid input");
+                inputField.setText(""); }
+            else {
+                double percent = Double.parseDouble(inputField.getText()) / 100;
+                percent = BigDecimal.valueOf(percent).setScale(10, RoundingMode.HALF_UP).doubleValue();
+                resultLbl.setText(Double.toString(percent));
+                inputField.setText(""); }
+        }else {
+            resultLbl.setText("Invalid input");
+            inputField.setText("");
         }
     }
 
@@ -244,7 +258,7 @@ public class Calculator extends JFrame implements ActionListener {
 
     /**
      * Checks if Input is valid for calculation
-     * @param input which is of typt JTextField
+     * @param input which is of type JTextField
      * @return true if input is invalid
      * */
     private boolean inputInValidTest(JTextField input){
@@ -254,26 +268,32 @@ public class Calculator extends JFrame implements ActionListener {
             input.getText().isEmpty() ||
 
             //Illegal char at start
-            Pattern.compile("[/*]").matcher(input.getText().substring(0,1)).find() ||
-
+            //Pattern.compile("[/*]").matcher(input.getText().substring(0,1)).find() ||
+                    Pattern.compile("^[*/]").matcher(input.getText()).find() ||
             //Illegal char at end
             Pattern.compile("[+\\-/*.]").matcher(Character.toString(input.getText().charAt(input.getText().length()-1))).find() ||
 
             // . Not followed by digit
             Pattern.compile("[.][^\\d]").matcher(input.getText()).find() ||
 
-            // Operators not followed by digit
+            // . followed by a digit followed by a .
+            Pattern.compile("[.][\\d]*[.]").matcher(input.getText()).find() ||
+
+
+            // Operators not followed by digit or .
             Pattern.compile("[\\-+/*][^\\d.]").matcher(input.getText()).find() ||
 
             //Operator followed by . must be followed by a digit
             Pattern.compile("[\\-+/*][.][^\\d]").matcher(input.getText()).find() ||
+
+                    //Pattern.compile("([.][^\\d]) | ([\\-+/*][^\\d.]) | ([\\-+/*][.][^\\d])").matcher(inputField.getText()).find() ||
 
             //If input has no digits
             !Pattern.compile("[\\d]").matcher(input.getText()).find()
         );
     }
 
-    //  Computes calculation on Input called
+    //  Computes calculation on Input called , this method can be reused.
     private void computeInput() {
         // 1st checks if input is valid
         if (inputInValidTest(inputField)){

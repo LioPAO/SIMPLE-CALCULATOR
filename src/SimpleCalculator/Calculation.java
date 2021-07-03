@@ -27,8 +27,7 @@ public class Calculation {
         //recursion
 
 //---------- addition and subtraction ------------------------------------------------------------------
-        //If eqn contains both addition and subtraction
-        //Sets order of addition and subtraction operation from left to right
+        //Sets order of addition and subtraction operation if both are in eqn from left to right
         if(equation.contains("-") && equation.contains("+")){
             //If addition is before subtraction, execute subtraction last (Remember we are in recursion -> first executed is last)
             if(equation.indexOf("+") < equation.indexOf("-")){
